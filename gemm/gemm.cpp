@@ -4,6 +4,7 @@
 #include <random>
 #include <cassert>
 #include <chrono>
+#include <cstdio>
 
 #include <xmmintrin.h>
 
@@ -26,21 +27,13 @@ void transMatToM128(float (&src)[N][N], __m128 (&dst)[N][N / 4]) {
   assert(N % 4 == 0);
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; j += 4) {
-      dst[i][j / 4] = _mm_set_ps(A[i][j], A[i][j + 1], A[i][j + 2], A[i][j + 3]);
-      printf("%d, %d\n", i, j);
+      dst[i][j / 4] = _mm_setr_ps(src[i][j], src[i][j + 1], src[i][j + 2], src[i][j + 3]);
+      //printM128(dst[i][j / 4]);
+      // don't do this, will cast the value type in-place
+      //float* p = (float*)(&dst[i][j / 4]);
     }
   }
 }
-
-// for linux
-//uint64_t nanos() {
-//  struct timespec start;
-//  clock_gettime(CLOCK_MONOTONIC, &start);
-//  return (uint64_t)start.tv_sec*1000000000 + (uint64_t)start.tv_nsec;
-//}
-
-// for windows
-
 
 void printMat(float (&M)[N][N]) {
   printf("[\n");
@@ -97,28 +90,33 @@ void blockTrans() {
   }
 }
 
+void printM128(__m128 x) {
+  float* p = (float*)(&x);
+  printf("copied: %f, %f, %f, %f\n", p[0], p[1], p[2], p[3]);
+}
+
 int main() {
-  printf("hello\n");
+  // not working when program crashes:
+  setbuf(stdout, NULL);
+  std::cout << "hello\n";
+  //fflush(stdout);
+
   initMat();
   __m128 _A[N][N / 4];
   transMatToM128(A, _A);
 
-  printf("value is: %f\n", _mm_cvtss_f32(_A[0][0]));
 
-  //uint64_t tic = nanos();
   auto tic = std::chrono::high_resolution_clock::now();
 
   naive();
   //trans();
   //blockTrans();
 
-  //uint64_t toc = nanos();
   auto toc = std::chrono::high_resolution_clock::now();
-  double gap = std::chrono::duration<double, std::milli>(tic - toc).count();
+  double gap = std::chrono::duration<double, std::milli>(toc - tic).count();
 
   long FLOP = 1LL * N * N * N * 2 * 1e-9;
   std::cout << N << "," << FLOP << std::endl;
-  //printf("%f GFLOPS\n", FLOP / ((toc - tic) * 1e-9));
   printf("%f GFLOPS\n", FLOP / (gap * 1e-3));
 
   //printMat(C);
